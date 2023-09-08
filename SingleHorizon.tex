@@ -1,9 +1,16 @@
-\documentclass{article}
+\documentclass[a4paper,11pt]{article} 
+
+\usepackage[english]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage[version=4]{mhchem} 
 \usepackage{graphicx} % Required for inserting images
-\usepackage{amsmath,amsfonts,amsthm,bm} %math
+\usepackage{amsmath,amsfonts,amsthm,bm,amssymb} %math
 \usepackage{mathtools,leftindex,tensor,mhchem}
 \usepackage{eurosym}
 \usepackage{blindtext}
+\usepackage{tikz}
+\usetikzlibrary{shapes}
+\usepackage{natbib}
 \usepackage{hyperref}
 %----------------------------------------
 %Align Equations to LEFT MARGIN (use \mathleft then \mathcenter)
@@ -229,12 +236,12 @@ where $Swap(at,af)[ \prescript{op}{exch}{P}][at = a,af = b] = \prescript{op}{exc
 
 \begin{equation} \tag{Ctr\_Op\_rampPlus2}
    \textbf{Diff} \left [  \textcolor{blue}{ \prescript{op}{conv}{P}} ; 2h \right ] \leq  \textcolor{blue}{\prescript{op}{conv}{\rho^{\max,1h}}} *  \prescript{pl}{conv}{P} \hfill [\textcolor{red}{evi}  \times \textcolor{red}{at}]
-\label{eq:Ctr_Op_rampPlus}
+\label{eq:Ctr_Op_rampPlus2}
 \end{equation}
 
 \begin{equation} \tag{Ctr\_Op\_rampMoins2}
    -\textbf{Diff} \left [  \textcolor{blue}{ \prescript{op}{conv}{P}} ; 2h \right ]  \geq  \textcolor{blue}{\prescript{op}{conv}{\rho^{\min,1h}}} *  \prescript{pl}{conv}{P} \hfill [\textcolor{red}{evi}  \times \textcolor{red}{at}]
-\label{eq:Ctr_Op_rampMoins}
+\label{eq:Ctr_Op_rampMoins2}
 \end{equation}
 
 
@@ -332,12 +339,12 @@ where $Swap(at,af)[ \prescript{op}{exch}{P}][at = a,af = b] = \prescript{op}{exc
 
 \begin{equation} \tag{Ctr\_Pl\_storage\_max\_capacity}
    \prescript{pl}{sto}{E^{\max}}  \leq  \textcolor{blue}{\prescript{pl}{sto}{E^{\max,\max}}} \hfill [\textcolor{red}{at} \times \textcolor{red}{evo} \times \textcolor{red}{st}]
-\label{eq:Ctr_Pl_storage_min_capacity}
+\label{eq:Ctr_Pl_storage_max_capacity}
 \end{equation}
 
-\begin{equation} \tag{Ctr\_Pl\_storage\_max\_capacity}
+\begin{equation} \tag{Ctr\_Pl\_storage\_max\_capacity2}
   \prescript{pl}{sto}{E^{\max}} = \prescript{pl}{sto}{P^{\max}}  * \textcolor{blue}{\prescript{op}{sto}{NH^{\max}}} \hfill [\textcolor{red}{at} \times \textcolor{red}{evo} \times \textcolor{red}{st}]
-\label{eq:Ctr_Pl_storage_min_capacity}
+\label{eq:Ctr_Pl_storage_max_capacity2}
 \end{equation}
 
 
