@@ -1,0 +1,476 @@
+\documentclass{article}
+\usepackage{graphicx} % Required for inserting images
+\usepackage{amsmath,amsfonts,amsthm,bm} %math
+\usepackage{mathtools,leftindex,tensor,mhchem}
+\usepackage{eurosym}
+\usepackage{blindtext}
+\usepackage{hyperref}
+%----------------------------------------
+%Align Equations to LEFT MARGIN (use \mathleft then \mathcenter)
+\makeatletter
+\newcommand{\mathleft}{\@fleqntrue\@mathmargin0pt}
+\newcommand{\mathcenter}{\@fleqnfalse}
+\makeatother
+%----------------------------------------
+
+\usepackage{xcolor}
+\title{Equations EAP}
+\author{Robin Girard }
+\date{August 2023}
+
+\begin{document}
+
+\maketitle
+\tableofcontents
+\footnotesize
+\section{Introduction and conventions}
+\paragraph{This is LEAP Equations} This document provides a description of the set of equations in \href{https://github.com/robingirard/Energy-Alternatives-Planning/blob/master/Models/Linopy/f_planningModels_linopy.py}{Linopy sEnergy Alternative Planning}, a multi-energy planning tool implemented with Linopy and available in open source. 
+\\
+
+\paragraph{It inherits from xarray}. An important thing to understand is that Linopy is built on \href{https://docs.xarray.dev/en/stable/}{xarray}, which implements vector operations that implicitly perform tensorial products. For example, if one has two xarrays $x$ indexed by $[i,k]$ and $y$ by $[j, k]$, $x + y$ gives an xarray $z[i,j,k]$ where $z[i,j,k] = x[i,k]+ y[j,k]$.
+
+
+\paragraph{Writing conventions}
+Sets (indexes) are in \textcolor{red}{red}, Parameters (not optimized and given as input) are in \textcolor{blue}{blue} and Variables (optimized) in black.
+
+\paragraph{Modeling conventions}
+All power is $P$, all demand is $D$ (except storage inflow), all cost is $C$, all unit cost is $UC$, all energy is $E$. 
+
+\paragraph{Optim conventions}
+All Variables are non negative. 
+
+
+\newpage
+\section{Objective function and Demand constraint}
+
+\footnotesize
+\begin{table}[h]
+\footnotesize
+  \centering
+  \caption{\textcolor{red}{Sets} }
+  \begin{tabular}{ll}
+    \hline
+    \textbf{Symbol} & \textbf{Lynopy-python name} \\ \hline
+    $\textcolor{red}{d}$ & \verb|date|  \\  
+    $\textcolor{red}{evo}$ & \verb|energy_vector_out|  \\
+    $\textcolor{red}{evi}$ & \verb|energy_vector_in|  \\  
+    $\textcolor{red}{at}$ & \verb|area_to|  \\ 
+    $\textcolor{red}{af}$ & \verb|area_from|  \\ 
+    $\textcolor{red}{ct}$ & \verb|conversion_technology|\\
+    $\textcolor{red}{st}$ & \verb|storage_technology| \\
+    $\textcolor{red}{fd}$ & \verb|flexible_demand| \\  \hline
+  \end{tabular}
+\end{table}
+
+\begin{table}[h]
+\footnotesize
+  \centering
+    \caption{Cost variables}
+  \begin{tabular}{llll}
+    \hline
+    
+    \textbf{Symbol} & \textbf{Lynopy-python name} & \textbf{unit}  & \textbf{domain} \\ \hline
+    
+    $\prescript{op}{nrj}{C}$  & \verb|operation_energy_cost|  & \euro & $\textcolor{red}{at} \times \textcolor{red}{evi}$\\ 
+
+    $\prescript{pl}{conv}{C}$ & \verb|planning_conversion_cost|& \euro & $\textcolor{red}{at} \times \textcolor{red}{evo} \times \textcolor{red}{ct}$\\  
+
+    $\prescript{pl}{sto}{C}$ & \verb|planning_storage_energy_cost|& \euro & $\textcolor{red}{at} \times \textcolor{red}{evo} \times \textcolor{red}{st}$ \\ 
+    
+    $\prescript{pl}{dsm}{C}$ & \verb|planning_flexible_demand_cost|& \euro & $\textcolor{red}{at} \times \textcolor{red}{evo} \times \textcolor{red}{fd}$ \\
+    \hline
+    
+  \end{tabular}
+\end{table}
+
+
+$$min : \sum_{} \prescript{op}{nrj}{C}  + \sum \prescript{pl}{conv}{C} + \sum \prescript{pl}{sto}{C} + \sum \prescript{pl}{flexd}{C} + \prescript{op}{exch}{P}*0.01  $$
+The last term is used here to avoid a dummy exchange solution. 
+Demand Equation labeled (Ctr\_Op\_operation\_demand) applies on   $[\textcolor{red}{evo}  \times \textcolor{red}{at}]$
+\begin{align} 
+    \prescript{op}{tot,h}{D} = & \sum_{\textcolor{red}{ct}}  \prescript{op}{conv}{P} \tag{Conversion technologies } \\ 
+    &+\sum_{\textcolor{red}{st}} (\prescript{op}{sto}{P^{out}} -\prescript{op}{sto}{P^{in}}) \tag{Storage technologies}\\
+    &+ \sum_{\textcolor{red}{af}}  \prescript{op}{exch}{P} - \sum_{\textcolor{red}{af}} Swap(at,af)[ \prescript{op}{exch}{P}]
+    \tag{Exchange between areas}\\   
+    & - \sum_{\textcolor{red}{fd}}  \prescript{op}{flexd}{D} \tag{Flexible demand  } \\   
+%\label{eq:Ctr_Op_operation_demand}
+\end{align}
+where $Swap(at,af)[ \prescript{op}{exch}{P}][at = a,af = b] = \prescript{op}{exch}{P}[at = b,af = a] $
+
+
+
+\newpage
+
+\section{Conversion technology constraints}
+
+\subsection{Main parameters, variables and constraints}
+
+\begin{table}[h]
+\footnotesize % \small ? 
+  \centering
+    \caption{Main variables}
+  \begin{tabular}{llll}
+    \hline
+    
+    \textbf{Symbol} & \textbf{Lynopy-python name} & \textbf{unit}  & \textbf{domain} \\ \hline
+    
+    $ \prescript{op}{conv}{P}$ & \verb|operation_conversion_power|  & MW & $\textcolor{red}{evo} \times \textcolor{red}{at} \times \textcolor{red}{d} \times \textcolor{red}{ct}$ \\
+    
+    $\prescript{op}{tot,h}{D} $ & \verb|operation_total_hourly_demand|& MW & $\textcolor{red}{evo} \times \textcolor{red}{at} \times \textcolor{red}{d}$ \\ 
+    
+    $\prescript{op}{tot,h}{I} $& \verb|operation_yearly_importation|& MWh & $\textcolor{red}{at} \times \textcolor{red}{evi}$ \\ \hline
+    
+    $\prescript{pl}{conv}{P^{\max}}$ & \verb|planning_conversion_power_capacity|& MW & $\textcolor{red}{evo} \times \textcolor{red}{at} \times \textcolor{red}{ct}$ \\ \hline
+    
+  \end{tabular}
+\end{table}
+
+\begin{table}[h]
+\footnotesize
+\centering
+\caption{Main \textcolor{blue}{parameters}}
+\begin{tabular}{llll}
+\hline
+    \textbf{Symbol} & \textbf{Lynopy-python name} & \textbf{unit}  & \textbf{domain} \\ \hline
+    $\textcolor{blue}{\Delta T }$&  \verb|time_stamp_length| & p.u & $\textcolor{red}{d}$ \\ 
+    
+    $\textcolor{blue}{\prescript{op}{exo,h}{D}}$&  \verb|exogenous_energy_demand| & MW & $\textcolor{red}{evi}  \times \textcolor{red}{at} \times \textcolor{red}{d}$ \\ 
+       
+    $\textcolor{blue}{\prescript{op}{nrj}{UC}}$&  \verb|operation_energy_unit_cost| & \euro/MWh & $\textcolor{red}{evi}  \times \textcolor{red}{at}$  \\ 
+    
+     $\textcolor{blue}{\prescript{op}{conv}{AF}}$&\verb|operation_conversion_availability_factor| &  p.u & $\textcolor{red}{evo}  \times \textcolor{red}{at}  \times \textcolor{red}{ct} \times \textcolor{red}{d}$ \\
+     
+    $\textcolor{blue}{\prescript{op}{conv}{\eta}}$&  \verb|operation_conversion_efficiency| & p.u & $\textcolor{red}{evo}  \times \textcolor{red}{at}  \times \textcolor{red}{ct}$ \\ \hline
+    
+    $\textcolor{blue}{\prescript{pl}{conv}{UC}}$ &  \verb|planning_conversion_unit_cost| & \euro /kW/year  & $\textcolor{red}{evo}  \times \textcolor{red}{at}  \times \textcolor{red}{ct}$  \\
+  
+    $\textcolor{blue}{ \prescript{pl}{conv}{P}^{\max,\min}}$ &  \verb|planning_conversion_min_capacity| & MW & $\textcolor{red}{evo}  \times \textcolor{red}{at}  \times \textcolor{red}{ct}$   \\ 
+    
+    $\textcolor{blue}{ \prescript{pl}{conv}{P}^{\max,\max }}$ &  \verb|planning_conversion_max_capacity| & MW & $\textcolor{red}{evo}  \times \textcolor{red}{at}  \times \textcolor{red}{ct}$  \\ \hline
+  \end{tabular}
+\end{table}
+
+\paragraph{Operation}
+\mathleft
+\begin{equation} \tag{Ctr\_Op\_operation\_costs}
+    \prescript{op}{nrj}{C} = \textcolor{blue}{\textcolor{blue}{\prescript{op}{nrj}{UC}}}  *  \prescript{op}{tot,h}{I} \hfill [\textcolor{red}{evi}  \times \textcolor{red}{at}]
+\label{eq:Ctr_Op_operation_costs}
+\end{equation}
+\begin{equation} \tag{Ctr\_Op\_conso\_hourly}
+    \prescript{op}{tot,h}{D} = \textcolor{blue}{\prescript{op}{exo,h}{D}}  \hfill [\textcolor{red}{at} \times \textcolor{red}{evo} \times \textcolor{red}{d}]
+\label{eq:Ctr_Op_conso_hourly}
+\end{equation}
+\begin{equation} \tag{Ctr\_Op\_operation\_costs}
+    \prescript{op}{tot,h}{I} = \sum_{\textcolor{red}{evo} \times \textcolor{red}{ct}\times \textcolor{red}{d} \;\; \& \;\;\textcolor{red}{evo} \in \textcolor{red}{ct}} \textcolor{blue}{\Delta T } \prescript{op}{conv}{P} / \textcolor{blue}{\prescript{op}{conv}{\eta}} \hfill [\textcolor{red}{evi}  \times \textcolor{red}{at}]
+\label{eq:Ctr_Op_conso_yearly_1}
+\end{equation}
+
+
+\begin{equation} \tag{Ctr\_Op\_capacity}
+   \prescript{op}{conv}{P}  \leq  \prescript{pl}{conv}{P^{\max}} * \textcolor{blue}{\prescript{op}{conv}{AF}} \hfill [\textcolor{red}{evi}  \times \textcolor{red}{at}]
+\label{eq:Ctr_Op_capacity}
+\end{equation}
+
+\paragraph{Planning}
+\begin{equation} \tag{Ctr\_Pl\_capacity}
+   \prescript{pl}{conv}{C} = \textcolor{blue}{\prescript{pl}{conv}{UC}}  *  \prescript{pl}{conv}{P^{\max}} \hfill [\textcolor{red}{evi}  \times \textcolor{red}{at}]
+\label{eq:Ctr_Pl_capacity}
+\end{equation}
+\begin{equation} \tag{Ctr\_Pl\_max\_capacity}
+   \prescript{pl}{conv}{P^{\max}}  \leq \textcolor{blue}{ \prescript{pl}{conv}{P}^{\max,\max}}    \hfill [\textcolor{red}{evi}  \times \textcolor{red}{at}]
+\label{eq:Ctr_Pl_planning_max_capacity}
+\end{equation}
+
+\begin{equation} \tag{Ctr\_Pl\_min\_capacity}
+   \prescript{pl}{conv}{P^{\max}}  \geq  \textcolor{blue}{ \prescript{pl}{conv}{P}^{\max,\min}} \hfill [\textcolor{red}{evi}  \times \textcolor{red}{at}]
+\label{eq:Ctr_Pl_planning_min_capacity}
+\end{equation}
+
+\newpage
+\subsection{Optional parameters, variables and constraints}
+
+\begin{table}[h]
+\footnotesize
+\centering
+\caption{Optional constraints \textcolor{blue}{parameters}}
+\begin{tabular}{llll}
+\hline
+    \textbf{Symbol} & \textbf{Lynopy-python name} & \textbf{unit}  & \textbf{domain} \\ \hline
+    
+    $\textcolor{blue}{\prescript{op}{conv}{NH^{\max}}}$&      \verb|operation_conversion_maximum_working_hours| & Nb hours & $\textcolor{red}{evo}  \times \textcolor{red}{at} \times \textcolor{red}{ct} $ \\ 
+    
+    $\textcolor{blue}{\prescript{op}{conv}{\rho^{\max,1h}}}$&  \verb|operation_max_1h_ramp_rate| & p.u & $\textcolor{red}{evo}  \times \textcolor{red}{at} \times \textcolor{red}{ct} $  \\ 
+    
+    $\textcolor{blue}{\prescript{op}{conv}{\rho^{\min,1h}}}$&  \verb|operation_min_1h_ramp_rate| & p.u & $\textcolor{red}{evo}  \times \textcolor{red}{at} \times \textcolor{red}{ct} $  \\ 
+    
+    $\textcolor{blue}{\prescript{op}{conv}{\rho^{\max,2h}}}$&  \verb|operation_max_2h_ramp_rate| & p.u & $\textcolor{red}{evo}  \times \textcolor{red}{at} \times \textcolor{red}{ct} $  \\ 
+    
+    $\textcolor{blue}{\prescript{op}{conv}{\rho^{\min,2h}}}$&  \verb|operation_min_2h_ramp_rate| & p.u & $\textcolor{red}{evo}  \times \textcolor{red}{at} \times \textcolor{red}{ct} $   \\ \hline
+    
+    $\textcolor{blue}{\prescript{op}{nrj}{E}}$ &  \verb|energy_vector_stock| & p.u & $\textcolor{red}{evo}  \times \textcolor{red}{at} \times \textcolor{red}{ct} $   \\ \hline
+    
+  \end{tabular}
+\end{table}
+
+\begin{equation} \tag{Ctr\_Op\_stock}
+   \sum_{\textcolor{red}{d}} \textcolor{blue}{\Delta T} \textcolor{blue}{ \prescript{op}{conv}{P}}  \leq  \textcolor{blue}{\prescript{op}{conv}{NH^{\max}}} *  \prescript{pl}{conv}{P} \hfill [\textcolor{red}{evi}  \times \textcolor{red}{at}]
+\label{eq:Ctr_Op_stock}
+\end{equation}
+
+\begin{equation} \tag{Ctr\_Op\_rampPlus}
+   \textbf{Diff} \left [  \textcolor{blue}{ \prescript{op}{conv}{P}} ; 1h \right ] \leq  \textcolor{blue}{\prescript{op}{conv}{\rho^{\max,1h}}} *  \prescript{pl}{conv}{P} \hfill [\textcolor{red}{evi}  \times \textcolor{red}{at}]
+\label{eq:Ctr_Op_rampPlus}
+\end{equation}
+
+\begin{equation} \tag{Ctr\_Op\_rampMoins}
+   -\textbf{Diff} \left [  \textcolor{blue}{ \prescript{op}{conv}{P}} ; 1h \right ]  \geq  \textcolor{blue}{\prescript{op}{conv}{\rho^{\min,1h}}} *  \prescript{pl}{conv}{P} \hfill [\textcolor{red}{evi}  \times \textcolor{red}{at}]
+\label{eq:Ctr_Op_rampMoins}
+\end{equation}
+
+\begin{equation} \tag{Ctr\_Op\_rampPlus2}
+   \textbf{Diff} \left [  \textcolor{blue}{ \prescript{op}{conv}{P}} ; 2h \right ] \leq  \textcolor{blue}{\prescript{op}{conv}{\rho^{\max,1h}}} *  \prescript{pl}{conv}{P} \hfill [\textcolor{red}{evi}  \times \textcolor{red}{at}]
+\label{eq:Ctr_Op_rampPlus}
+\end{equation}
+
+\begin{equation} \tag{Ctr\_Op\_rampMoins2}
+   -\textbf{Diff} \left [  \textcolor{blue}{ \prescript{op}{conv}{P}} ; 2h \right ]  \geq  \textcolor{blue}{\prescript{op}{conv}{\rho^{\min,1h}}} *  \prescript{pl}{conv}{P} \hfill [\textcolor{red}{evi}  \times \textcolor{red}{at}]
+\label{eq:Ctr_Op_rampMoins}
+\end{equation}
+
+
+
+\newpage
+
+\section{Storage constraints}
+\footnotesize
+\begin{table}[h]
+\footnotesize
+  \centering
+    \caption{Storage variables}
+  \begin{tabular}{llll}
+    \hline
+    \textbf{Symbol} & \textbf{Lynopy-python name} & \textbf{unit}  & \textbf{domain} \\ \hline
+    
+    $\prescript{op}{sto}{P^{in}}$ & \verb|operation_storage_power_in| & MWh & $\textcolor{red}{evo} \times \textcolor{red}{at} \times \textcolor{red}{d} \times \textcolor{red}{st}$ \\ 
+    
+    $\prescript{op}{sto}{P^{out}}$  & \verb|operation_storage_power_out|& MWh & $\textcolor{red}{evo} \times \textcolor{red}{at} \times \textcolor{red}{d} \times \textcolor{red}{st}$\\ 
+    
+    $\prescript{op}{sto}{E}$  & \verb|operation_storage_internal_energy_level|& MWh & $\textcolor{red}{evo} \times \textcolor{red}{at} \times \textcolor{red}{d} \times \textcolor{red}{st}$ \\ \hline
+     
+    $\prescript{pl}{sto}{E^{\max}}$ & \verb|planning_storage_energy_capacity|& MWh & $\textcolor{red}{evo} \times \textcolor{red}{at} \times \textcolor{red}{ct}$\\ 
+    
+    $\prescript{pl}{sto}{P^{\max}}$ & \verb|planning_storage_power_capacity|& MW & $\textcolor{red}{evo} \times \textcolor{red}{at} \times \textcolor{red}{ct}$ \\ \hline
+  \end{tabular}
+\end{table}
+
+\begin{table}[h]
+\footnotesize
+\centering
+
+\caption{Storage parameters}
+\begin{tabular}{llll}
+\hline
+    \textbf{Symbol} & \textbf{Lynopy-python name} & \textbf{unit}  & \textbf{domain} \\ \hline
+    
+    $\textcolor{blue}{\prescript{op}{sto}{NH^{\max}}}$&  \verb|operation_storage_hours_of_stock| & Nb hours & $\textcolor{red}{evo}  \times \textcolor{red}{at} \times \textcolor{red}{st} $ \\ 
+    
+    $\textcolor{blue}{\prescript{op}{sto}{\eta^{in}}}$&  \verb|operation_storage_efficiency_in| & p.u & $\textcolor{red}{evo}  \times \textcolor{red}{at} \times \textcolor{red}{st} $  \\ 
+    
+    $\textcolor{blue}{\prescript{op}{sto}{\eta^{out}}}$&  \verb|operation_storage_efficiency_out| & p.u & $\textcolor{red}{evo}  \times \textcolor{red}{at} \times \textcolor{red}{st} $  \\    
+    
+    $\textcolor{blue}{\prescript{op}{sto}{\alpha}}$&  \verb|operation_storage_dissipation| & p.u & $\textcolor{red}{evo}  \times \textcolor{red}{at} \times \textcolor{red}{st} $  \\  \hline
+    
+    $\textcolor{blue}{\prescript{pl}{sto}{E^{\max,\min}}}$&  \verb|planning_storage_min_energy_capacity| & p.u & $\textcolor{red}{evo}  \times \textcolor{red}{at} \times \textcolor{red}{ct} $   \\ 
+    
+    $\textcolor{blue}{\prescript{pl}{sto}{E^{\max,\max}}}$ & \verb|planning_storage_max_energy_capacity| & p.u & $\textcolor{red}{evo}  \times \textcolor{red}{at} \times \textcolor{red}{ct} $ \\
+    
+    $\textcolor{blue}{\prescript{pl}{sto}{UC}}$ & \verb|planning_storage_energy_unit_cost| & p.u & $\textcolor{red}{evo}  \times \textcolor{red}{at} \times \textcolor{red}{ct} $  \\
+    
+    $\textcolor{blue}{\prescript{pl}{sto}{P^{max}}}$ & \verb|planning_storage_max_power| & p.u & $\textcolor{red}{evo}  \times \textcolor{red}{at} \times \textcolor{red}{ct} $ \\ \hline
+    
+  \end{tabular}
+\end{table}
+
+\paragraph{Operation}
+
+\begin{equation} \tag{Ctr\_Op\_storage\_level\_definition}
+    \prescript{op}{sto}{E}_{t+1} = \prescript{op}{sto}{E}_{t} * (1-\textcolor{blue}{\prescript{op}{sto}{\alpha}})+ \textcolor{blue}{\Delta T }_t\prescript{op}{sto}{P^{in}_t}*\textcolor{blue}{\prescript{op}{sto}{\eta^{in}}} - \textcolor{blue}{\Delta T }_t\prescript{op}{sto}{P^{out}_t} / \textcolor{blue}{\prescript{op}{sto}{\eta^{out}}} \hfill [\textcolor{red}{at} \times \textcolor{red}{evo} \times \textcolor{red}{d} \times \textcolor{red}{st}]
+\label{eq:Ctr_Op_storage_level_definition}
+\end{equation}
+
+\begin{equation} \tag{Ctr\_Op\_storage\_initial\_level}
+    \prescript{op}{sto}{E}_{0} =  \prescript{op}{sto}{E}_{end} \hfill [\textcolor{red}{at} \times \textcolor{red}{evo} \times \textcolor{red}{st}]
+\label{eq:Ctr_Op_storage_initial_level}
+\end{equation}
+
+\begin{equation} \tag{Ctr\_Op\_storage\_power\_out\_max}
+    \prescript{op}{sto}{P^{out}} \leq \prescript{pl}{sto}{P^{\max}} \hfill [\textcolor{red}{at} \times \textcolor{red}{evo}\times \textcolor{red}{d}  \times \textcolor{red}{st}]
+\label{eq:Ctr_Op_storage_power_in_max}
+\end{equation}
+
+\begin{equation} \tag{Ctr\_Op\_storage\_power\_in\_max}
+    \prescript{op}{sto}{P^{in}} \leq \prescript{pl}{sto}{P^{\max}} \hfill [\textcolor{red}{at} \times \textcolor{red}{evo}\times \textcolor{red}{d}  \times \textcolor{red}{st}]
+\label{eq:Ctr_Op_storage_power_out_max}
+\end{equation}
+
+\begin{equation} \tag{Ctr\_Op\_storage\_capacity\_max}
+    \prescript{op}{sto}{E} \leq \prescript{pl}{sto}{E^{\max}} \hfill [\textcolor{red}{at} \times \textcolor{red}{evo}\times \textcolor{red}{d}  \times \textcolor{red}{st}]
+\label{eq:Ctr_Op_storage_capacity_max}
+\end{equation}
+
+
+\paragraph{Planning}
+\begin{equation} \tag{Ctr\_Pl\_planning\_storage\_capacity\_costs}
+    \prescript{pl}{sto}{C} = \textcolor{blue}{\prescript{pl}{sto}{UC}} *    \prescript{pl}{sto}{E^{\max}} \hfill [\textcolor{red}{at} \times \textcolor{red}{evo} \times \textcolor{red}{st}]
+\label{eq:Ctr_Pl_planning_storage_capacity_costs}
+\end{equation}
+
+\begin{equation} \tag{Ctr\_Pl\_storage\_min\_capacity}
+   \prescript{pl}{sto}{E^{\max}}  \geq  \textcolor{blue}{\prescript{pl}{sto}{E^{\max,\min}}} \hfill [\textcolor{red}{at} \times \textcolor{red}{evo} \times \textcolor{red}{st}]
+\label{eq:Ctr_Pl_storage_min_capacity}
+\end{equation}
+
+\begin{equation} \tag{Ctr\_Pl\_storage\_max\_capacity}
+   \prescript{pl}{sto}{E^{\max}}  \leq  \textcolor{blue}{\prescript{pl}{sto}{E^{\max,\max}}} \hfill [\textcolor{red}{at} \times \textcolor{red}{evo} \times \textcolor{red}{st}]
+\label{eq:Ctr_Pl_storage_min_capacity}
+\end{equation}
+
+\begin{equation} \tag{Ctr\_Pl\_storage\_max\_capacity}
+  \prescript{pl}{sto}{E^{\max}} = \prescript{pl}{sto}{P^{\max}}  * \textcolor{blue}{\prescript{op}{sto}{NH^{\max}}} \hfill [\textcolor{red}{at} \times \textcolor{red}{evo} \times \textcolor{red}{st}]
+\label{eq:Ctr_Pl_storage_min_capacity}
+\end{equation}
+
+
+\newpage
+
+\section{Demand Side Management constraints}
+
+\begin{table}[h]
+\footnotesize
+  \centering
+    \caption{Demand side management  variables}
+  \begin{tabular}{llll}
+    \hline
+    \textbf{Symbol} & \textbf{Lynopy-python name} & \textbf{unit}  & \textbf{domain} \\ \hline
+    
+    $\prescript{op}{dsm}{D}$ & \verb|operation_flexible_demand| & MWh & $\textcolor{red}{evo} \times \textcolor{red}{at} \times \textcolor{red}{d} \times \textcolor{red}{fd}$ \\ 
+    
+    $\prescript{pl}{dsm}{\Delta D^{\max}}$ & \verb|planning_flexible_demand_max_power_increase| & MW & $\textcolor{red}{evo} \times \textcolor{red}{at} \times \textcolor{red}{d} \times \textcolor{red}{fd}$ \\ 
+
+    $\prescript{op}{dsm}{\beta}$ & \verb|operation_flexible_demand_variation_ratio| & MWh & $\textcolor{red}{evo} \times \textcolor{red}{at} \times \textcolor{red}{d} \times \textcolor{red}{fd}$ \\ 
+
+  \end{tabular}
+\end{table}
+
+\begin{table}[h]
+\footnotesize
+\centering
+
+\caption{Demand side management parameters}
+\begin{tabular}{llll}
+\hline
+    \textbf{Symbol} & \textbf{Lynopy-python name} & \textbf{unit}  & \textbf{domain} \\ \hline
+    
+    $\textcolor{blue}{\prescript{pl}{dsm}{UC}}$&  \verb|flexible_demand_planning_unit_cost| & \euro / kW / year & $\textcolor{red}{evo}  \times \textcolor{red}{at} \times \textcolor{red}{fd} $ \\ 
+    
+    $\textcolor{blue}{\prescript{pl}{dsm}{D}^{\max}}$&  \verb|flexible_demand_max_power| & MW & $\textcolor{red}{evo}  \times \textcolor{red}{at} \times \textcolor{red}{fd} $ \\ 
+
+    $\textcolor{blue}{\prescript{op}{dsm}{D^{exo}}}$&  \verb|flexible_demand_to_optimise| & MW & $\textcolor{red}{evo}  \times \textcolor{red}{at} \times \textcolor{red}{fd} $ \\ 
+    
+    $\textcolor{blue}{\prescript{op}{dsm}{\beta^{max}}}$&  \verb|flexible_demand_ratio_max| & MW & $\textcolor{red}{evo}  \times \textcolor{red}{at} \times \textcolor{red}{fd} $ \\ 
+  \end{tabular}
+\end{table}
+
+\begin{equation} \tag{Ctr\_Op\_planning\_flexible\_demand\_max\_power\_increase\_def}
+ \prescript{pl}{dsm}{C} = \textcolor{blue}{\prescript{pl}{dsm}{UC}}   * \prescript{pl}{dsm}{\Delta D^{\max}} \hfill [\textcolor{red}{at} \times \textcolor{red}{evo} \times \textcolor{red}{st}]
+\label{eq:Ctr_Op_planning_flexible_demand_max_power_increase_def}
+\end{equation}
+
+\begin{equation} \tag{Ctr\_Oplanning\_storage\_max\_power\_power}
+ \prescript{op}{dsm}{D} \leq  \prescript{pl}{dsm}{\Delta D^{\max}} *\textcolor{blue}{\prescript{pl}{dsm}{D}^{\max}} \hfill [\textcolor{red}{at} \times \textcolor{red}{evo} \times \textcolor{red}{st}]
+\label{eq:Ctr_Oplanning_storage_max_power_power}
+\end{equation}
+
+
+\begin{equation} \tag{Ctr\_Op\_conso\_flex}
+ \prescript{op}{dsm}{D} + \textcolor{blue}{\prescript{op}{dsm}{D^{exo}}} * \prescript{op}{dsm}{\beta} = \textcolor{blue}{\prescript{op}{dsm}{D^{exo}}} \hfill [\textcolor{red}{at} \times \textcolor{red}{evo} \times \textcolor{red}{st}]
+\label{eq:Ctr_Op_conso_flex}
+\end{equation}
+
+
+\begin{equation} \tag{Ctr\_Op\_conso\_flex\_sup\_rule}
+\prescript{op}{dsm}{\beta} \leq  \textcolor{blue}{\prescript{op}{dsm}{\beta^{max}}} \hfill [\textcolor{red}{at} \times \textcolor{red}{evo} \times \textcolor{red}{st}]
+\label{eq:Ctr_Op_conso_flex_sup_rule}
+\end{equation}
+
+\begin{equation} \tag{Ctr\_Op\_conso\_flex\_inf\_rule}
+\prescript{op}{dsm}{\beta} \geq - \textcolor{blue}{\prescript{op}{dsm}{\beta^{max}}} \hfill [\textcolor{red}{at} \times \textcolor{red}{evo} \times \textcolor{red}{st}]
+\label{eq:Ctr_Op_conso_flex_inf_rule}
+\end{equation}
+
+One of the three equation below depending on the value of parameter  \verb|flexible_demand_period|: 
+\begin{equation} \tag{Ctr\_Op\_consum\_eq\_week}
+ \sum_{\textcolor{red}{d} \in \textcolor{red}{week}} \prescript{op}{dsm}{D} = \sum_{\textcolor{red}{d} \in \textcolor{red}{week}} \textcolor{blue}{\prescript{op}{dsm}{D^{exo}}}  \hfill [\textcolor{red}{at} \times \textcolor{red}{evo} \times \textcolor{red}{fd} \times \textcolor{red}{week}]
+\label{eq:Ctr_Op_consum_eq_week}
+\end{equation}
+
+\begin{equation} \tag{Ctr\_Op\_consum\_eq\_day}
+ \sum_{\textcolor{red}{d} \in \textcolor{red}{day}} \prescript{op}{dsm}{D} = \sum_{\textcolor{red}{d} \in \textcolor{red}{day}} \textcolor{blue}{\prescript{op}{dsm}{D^{exo}}}  \hfill [\textcolor{red}{at} \times \textcolor{red}{evo} \times \textcolor{red}{fd} \times \textcolor{red}{day}]
+\label{eq:Ctr_Op_consum_eq_day}
+\end{equation}
+
+\begin{equation} \tag{Ctr\_Op\_consum\_eq\_year}
+ \sum_{\textcolor{red}{d} \in \textcolor{red}{yea}} \prescript{op}{dsm}{D} = \sum_{\textcolor{red}{d} \in \textcolor{red}{yea}} \textcolor{blue}{\prescript{op}{dsm}{D^{exo}}}  \hfill [\textcolor{red}{at} \times \textcolor{red}{evo} \times \textcolor{red}{fd} ]
+\label{eq:Ctr_Op_consum_eq_year}
+\end{equation}
+
+\newpage
+\section{Exchange constraints}
+
+
+\begin{table}[h]
+\footnotesize % \small ? 
+  \centering
+    \caption{Exchange variables and parameters}
+  \begin{tabular}{llll}
+    \hline
+    
+    \textbf{Symbol} & \textbf{Lynopy-python name} & \textbf{unit}  & \textbf{domain} \\ \hline
+    
+    $ \prescript{op}{exch}{P}$ & \verb|exchange_op_power|  & MWh & $\textcolor{red}{evo} \times \textcolor{red}{at} \times  \textcolor{red}{af} \times \textcolor{red}{d}$  \\
+    
+  \end{tabular}
+\end{table}
+
+
+  \begin{table}[h]
+\footnotesize % \small ? 
+  \centering
+
+\caption{Exchange parameters}
+
+
+\begin{tabular}{llll}
+\hline
+    \textbf{Symbol} & \textbf{Lynopy-python name} & \textbf{unit}  & \textbf{domain} \\ \hline
+    
+    $\textcolor{blue}{\prescript{op}{exch}{P^{\max}}}$&  \verb|operation_exchange_max_capacity| & Nb hours & $\textcolor{red}{at} \times \textcolor{red}{af} $ \\ 
+  \end{tabular}
+\end{table}
+
+\begin{equation} \tag{Ctr\_Op\_exchange\_max}
+   \prescript{op}{exch}{P} \leq \textcolor{blue}{\prescript{op}{exch}{P^{\max}}}  \hfill [ \textcolor{red}{at} \times \textcolor{red}{af}]
+\label{eq:Ctr_Op_exchange_max}
+\end{equation}
+
+
+
+
+\section{Further tasks}
+\begin{itemize}
+    \item Time slices 
+    \item changing equation names 
+\end{itemize}
+
+
+\end{document}
